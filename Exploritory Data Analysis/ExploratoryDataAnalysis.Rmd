@@ -1,0 +1,207 @@
+---
+title: "Exploratory Data Analysis Example"
+author: "Matthew W. Van Scoyoc"
+date: "Friday, January 16, 2015"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+---
+
+# R Markdown Intro 
+(Default text when you start a markdown document in RStudio)  
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+summary(cars)
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# R Markdown Tips
+- To start an R Markdown document select "R Markdown" from the options in the "New Document" dropdown.
+- Text in the white area is normal text in the final document.
+- R code is written in "chunks" (the grey areas) or in-line using "`r "wirte code here"`".
+- Click on the "?" dropdown button to access markdown references. I use the "Markdown Quick Reference" in the help panel a lot.
+- There are a lot of chunk options, check out to <http://yihui.name/knitr/options/> when you are looking for something specific.
+- For more information on R Markdown go to <http://rmarkdown.rstudio.com/>. To start with, check out the "Home" page, "..Authoring/Markdown Basics" and "...Authoring/R Code Chunks".
+
+# Exploratory Data Analysis Example
+In this example will use the 'varespec' and 'varechem' data sets in the vegan package to conduct exploratory data analysis on lichen communities.
+We will also be using modified functions from the source file 'biostats.R' developed by Kevin McGarigal at the University of Massachusetts. 
+This source file has a lot of good functions for analyzing ecological data.  
+(Note that the three lines above this one did not break to a new line in the document.  
+You need to add 2 spaces at the end of a line if you want the next line to be a new line in the document.)
+
+```{r Setup, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+#----- Packages -----
+# Ecological community analysis tools
+library("vegan") # install.packages("vegan")
+# Data manipulation tools
+library("plyr") # install.packages("plyr")
+# Statistical tools
+library("moments") # install.packages("moments")
+# Plotting tools
+library("plotrix") # install.packages("plotrix")
+library("ggplot2") # install.packages("ggplot2")
+library("grid") # install.packages("grid")
+# Package for creating dynamic reports
+library("knitr") # install.packages("moments")
+
+#----- Additional functions -----
+# Summary table functions
+summary.table = function(dat){
+  require(moments)
+  dat = dat[, sapply(dat, is.numeric)]
+  names = colnames(dat)
+  nobs = as.vector(apply(dat, 2, function(x) length(x)))
+  NAs = as.vector(apply(dat, 2, function(x) sum(is.na(x))))
+  min = as.vector(apply(dat, 2, function(x) min(x, na.rm = T)))
+  max = as.vector(apply(dat, 2, function(x) max(x, na.rm = T)))
+  mean = round(as.vector(apply(dat, 2, function(x) mean(x, na.rm = T))), 3)
+  med = round(as.vector(apply(dat, 2, function(x) median(x, na.rm = T))), 3)
+  sd = round(as.vector(apply(dat, 2, function(x) sd(x, na.rm = T))), 3)
+  cv = round((sd / mean) * 100, 3)
+  skewness = round(as.vector(apply(dat, 2, function(x) skewness(x, na.rm = T))),
+                   3)
+  kurtosis = round(as.vector(apply(dat, 2, function(x) kurtosis(x, na.rm = T))),
+                   3)
+  stats.table = data.frame(names, nobs, NAs, min, mean, med, max, sd, cv,
+                           skewness, kurtosis)
+  return (stats.table)
+  detatch(moments)
+}
+
+# Mulit-plot function (modified from biostats.R)
+uv.plots <-
+  function(x,var=NULL,col.fill='blue',col.point='black',
+           col.line='red',...){
+    
+    oldpar<-par(no.readonly=TRUE)
+    
+    if(!is.null(var)){
+      y<-subset(x,select=eval(parse(text=var))) #select variables to summarize
+      y<-as.data.frame(y)
+    }
+    else{y<-as.data.frame(x)} #graphics settings
+    
+    #layout plot
+    layout(matrix(c(1,1,2,3,4,5),
+                  nrow=3,ncol=2,byrow=TRUE),
+           heights=c(.1,.45,.45),widths=c(.5,.5))
+    par(mar=c(1,1,1,1))
+    
+    #loop thru variables
+    for(i in 1:ncol(y)){ 
+      
+      #plot title
+      plot.new()
+      text(.5,.5,labels=names(y[i]),
+           font=2,cex=3,xpd=TRUE)
+      
+      #histogram (upper left panel)
+      par(mar=c(5,5,4,2))
+      hist(y[[i]],prob=TRUE,col=col.fill,
+           xaxs='i',yaxs='i',xlab=names(y[i]),
+           main='Histogram',...)
+      lines(density(y[[i]]))
+      
+      #box-and-whisker plot (upper right panel)
+      par(mar=c(5,5,4,2))
+      boxplot(y[i],col=col.fill,ylab=names(y[i]),
+              main='Box-and-Whisker Plot',...)
+      
+      #empirical distribution function plot (lower left panel)
+      par(mar=c(5,5,4,2))
+      plot(sort(y[[i]]),type='o',col=col.point,yaxs='i',xaxs='i',
+           xlab='Plot Number',ylab=names(y[i]),
+           main='Empirical Distribution',...)
+      
+      #normal quantile-quantile plot (lower right panel)
+      par(mar=c(5,5,4,2))
+      qqnorm(y[,i],datax=TRUE,col=col.point,
+             main='Normal Q-Q Plot',...)
+      y.IQR<-IQR(y[,i],na.rm=TRUE)
+      if(y.IQR>0)  qqline(y[,i],datax=TRUE,col=col.line,...)
+      
+      par(mar=c(1,1,1,1))    
+#      if(!i==ncol(y)) {readline("Press return for next plot ")}		
+      
+    } #end loop thru variables
+    
+    par(oldpar)
+  }
+
+# Puts histograms on the diagonal panels in the 'pairs()' funcion
+panel.hist <- function(x, ...)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5) )
+  h <- hist(x, plot = FALSE)
+  breaks <- h$breaks; nB <- length(breaks)
+  y <- h$counts; y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+# Put (absolute) correlations on the upper panels in the 'pairs()' funcion,
+# with size proportional to the correlations.
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- abs(cor(x, y))
+  txt <- format(c(r, 0.123456789), digits = digits)[1]
+  txt <- paste0(prefix, txt)
+  if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+```
+
+```{r Data, eval=TRUE, echo=FALSE}
+# Cover values of 44 plant species
+data(varespec)
+# Soil characteristics for each site
+data(varechem)
+```
+
+## Summary statistics
+```{r summary.tables, eval=TRUE, echo=FALSE, results='asis'}
+#----- Examination of species data -----
+kable(summary.table(varespec), digits = 2, caption = "Summary Statistics for Lichen Species Data")
+kable(summary.table(varechem), digits = 2, caption = "Summary Statistics for Soil Characteristics")
+```
+
+## Figures of each variable
+```{r plots, eval=TRUE, echo=FALSE, fig.height=8, fig.width=8, fig.align='center'}
+uv.plots(varespec)
+uv.plots(varechem)
+```
+```{r pairs.plot, echo=F, fig.height=10, fig.width=10, fig.align='center'}
+# Examine correlations between variables 
+pairs(varechem, lower.panel = panel.smooth, diag.panel = panel.hist, upper.panel = panel.cor, 
+      main = "Bivariate Plots with Histograms for Soil Characteristics")
+```
+
+-----
+
+```{r Versions, eval=TRUE, echo=FALSE}
+info = sessionInfo()
+r_ver = paste(info$R.version$major, info$R.version$minor, sep=".")
+```
+All analyses were performed using R (ver. `r r_ver`; R Core Team 2014), the package moments (ver. `r info$otherPkgs$moments$Version`; Komsta & Novomestky 2015) for summary statistics, the source file `biostats.R` developed by Kevin McGarigal for graphical diagnostics, and the package knitr (ver `r info$otherPkgs$knitr$Version`; Xie 2014) for reproducible research.   
+
+This report was automatically generated with R Markdown v2. The R session information (including the OS info, R version, and all packages used):
+```{r session, eval=TRUE, echo=FALSE}
+sessionInfo()
+Sys.time()
+```

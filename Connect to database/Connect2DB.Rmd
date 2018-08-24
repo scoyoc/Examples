@@ -1,0 +1,87 @@
+---
+title: "Connect R to a database"
+author: "Matthew Van Scoyoc"
+date: "August 30, 2016"
+output: html_document
+---
+
+```{r setup, eval=TRUE, echo=TRUE, message=FALSE}
+#' Packages
+#install.packages(c("RODBC", "dplyr", "tidyr", "knitr", "ggplot2"))
+library("RODBC")
+library("dplyr")
+library("tidyr")
+library("knitr")
+library("ggplot2")
+```
+
+## Connect database
+
+Here we will use the RODBC package to connect a Microsoft Access 2010 database 
+to R and read a table into R as a dataframe. Let't start by connecting the 
+database to R by using the odbcConnectAccess2007() command.
+
+```{r data, eval=TRUE, echo=TRUE}
+#' Open database connections
+my.dir <- "P:/1_ResourceStewardshipScience/Natural Resource Program/1 CARE range assessment project/4 Data & Photos/CARE Range DB"
+my.db <- "CARE_RangelandAssessmentData_Master.accdb"
+data.db <- odbcConnectAccess2007(paste(my.dir, my.db, sep = "/"))
+```
+
+## Read in tables
+
+Now let's use the sqlFetch() command to read a couple tables into R as 
+dataframes. We'll start with the tblPlots_Sampled table and produce a quick 
+summary of the number of plots sampled per allotment.
+
+```{r plots.sampd, eval=TRUE, echo=TRUE}
+#' Let's look at the number of plots sampled per allotment
+plots.sampd <- sqlFetch(data.db, "tblPlots_Sampled")
+kable(plots.sampd %>% 
+        group_by(Allotment) %>%
+        summarise(n())
+      )
+```
+
+Now lets read in the tblPellet_Counts table and summarize it for a figure.
+
+```{r scat, eval=TRUE, echo=TRUE, message=FALSE}
+#' Read in and subset scat data
+scat.cow.v.elk <- tbl_df(sqlFetch(data.db, "tblPellet_Counts")) %>%
+  filter(Animal == "cattle" | Animal == "elk") %>%
+  group_by(Plot_ID, Animal) %>%
+  summarise(Total = sum(Tally)) %>%
+  left_join(select(plots.sampd, Plot_ID, Allotment)) %>%
+  group_by(Allotment, Animal) %>%
+  summarise(Total = sum(Total))
+
+kable(scat.cow.v.elk)
+```
+
+## Figures
+
+Lastly, let's see what the scat data look like.
+
+```{r pressure, echo=TRUE}
+#' Make a bar plot of cattle and elk scat observed during the assessments.
+g <- ggplot(scat.cow.v.elk, aes(x = Animal, y = Total, fill = Animal)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ Allotment) +
+  theme_bw()
+print(g)
+```
+
+## Close database
+
+Okay, that was fun. Now we can close the database and remove it from the 
+workspace.
+
+```{r close, echo=TRUE}
+#+ Close DB, eval = TRUE, echo = TRUE ----
+odbcClose(data.db)
+rm(data.db)
+
+#+ EndScript ----
+Sys.Date()
+sessionInfo()
+```
