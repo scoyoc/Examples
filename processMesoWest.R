@@ -14,12 +14,28 @@ dat <- tbl_df(read.table(my.file, header = F, sep = ",", skip = 8,
 dat <- dat[, !apply(is.na(dat), 2, all)]
 
 # Summarize ----
+#-- EDGUT
 dly.prcp <- dat %>%
   group_by(Date) %>%
-  summarise(PRCP = max(precip_accum_set_1) - min(precip_accum_set_1))
-
-qplot(x = dly.prcp$Date, y = dly.prcp$PRCP, geom = "line", 
-      xlab = "Date", ylab = "PRCP", main = unique(dat$Station_ID)) +
+  summarise(PRCP = round(max(precip_accum_one_hour_set_1) - 
+              min(precip_accum_one_hour_set_1), 2))
+max(dat$precip_accum_one_hour_set_1) - min(dat$precip_accum_one_hour_set_1)
+ggplot(data = dly.prcp, aes(x = Date, y = PRCP)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(data = filter(dly.prcp, PRCP > 0), 
+            aes(label = PRCP), vjust = -0.3, size = 3.5) +
+  ggtitle("EDGUT") +
   theme_bw()
 
+#-- NLPU1
+dly.prcp <- dat %>%
+  group_by(Date) %>%
+  summarise(PRCP = round(max(precip_accum_set_1) - min(precip_accum_set_1), 2))
 max(dat$precip_accum_set_1) - min(dat$precip_accum_set_1)
+ggplot(data = dly.prcp, aes(x = Date, y = PRCP)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(data = filter(dly.prcp, PRCP > 0), 
+            aes(label = PRCP), vjust = -0.3, size = 3.5) +
+  ggtitle("NLPU1") +
+  theme_bw()
+
